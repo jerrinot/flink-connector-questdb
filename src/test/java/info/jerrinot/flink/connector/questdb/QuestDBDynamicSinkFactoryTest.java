@@ -4,6 +4,13 @@ import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
 import org.apache.flink.util.TestLoggerExtension;
 
+import org.apache.http.HttpEntity;
+import org.apache.http.client.methods.CloseableHttpResponse;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.apache.http.util.EntityUtils;
+import org.junit.AfterClass;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.testcontainers.containers.GenericContainer;
@@ -11,23 +18,38 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
+import java.io.IOException;
+import java.net.URLEncoder;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.concurrent.ExecutionException;
+
+import java.util.concurrent.TimeUnit;
 
 import static org.apache.flink.table.api.Expressions.row;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.fail;
 
 @ExtendWith(TestLoggerExtension.class)
 @Testcontainers
 public class QuestDBDynamicSinkFactoryTest {
+    private static final int ILP_PORT = 9009;
+    private static final int HTTP_PORT = 9000;
+
+    private static final CloseableHttpClient HTTP_CLIENT = HttpClients.createDefault();
+
+    @AfterClass
+    public static void classTearDown() throws IOException {
+        HTTP_CLIENT.close();
+    }
 
     @Container
     public GenericContainer questdb = new GenericContainer(DockerImageName.parse("questdb/questdb:6.5.1"))
             .withEnv("QDB_CAIRO_COMMIT_LAG", "100")
-            .withExposedPorts(9009);
+            .withEnv("JAVA_OPTS", "-Djava.locale.providers=JRE,SPI") // this makes QuestDB container much faster to start
+            .withExposedPorts(ILP_PORT, HTTP_PORT);
 
     @Test
-    public void testSmoke() throws ExecutionException, InterruptedException {
+    public void testSmoke() throws Exception {
         TableEnvironment tableEnvironment =
                 TableEnvironment.create(EnvironmentSettings.inStreamingMode());
 
@@ -44,7 +66,7 @@ public class QuestDBDynamicSinkFactoryTest {
                         + ")\n"
                         + "WITH (\n"
                         + String.format("'%s'='%s',\n", "connector", "questdb")
-                        + String.format("'%s'='%s',\n", "host", questdb.getHost() + ":" + questdb.getMappedPort(9009))
+                        + String.format("'%s'='%s:%d',\n", "host", questdb.getHost(), questdb.getMappedPort(ILP_PORT))
                         + String.format("'%s'='%s'\n", "table", "flink_table")
                         + ")");
 
@@ -60,6 +82,41 @@ public class QuestDBDynamicSinkFactoryTest {
                                 LocalDateTime.parse("2012-12-12T12:12:12")))
                 .executeInsert("questTable")
                 .await();
+        assertEventually(() -> {
+            assertSql("\"a\",\"b\",\"c\",\"d\",\"e\",\"f\",\"g\"\r\n"
+                    + "1,\"2022-06-01T10:10:10.000010Z\",\"ABCDE\",12.119999885559,2,\"2003-10-20T00:00:00.000000Z\",\"2012-12-12T12:12:12.000000Z\"\r\n",
+                    "select a, b, c, d, e, f, g from flink_table");
+        });
+    }
+
+    private static void assertEventually(Task task) throws Exception {
+        long deadLine = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
+        do {
+            try {
+                task.run();
+                return;
+            } catch (Throwable ignored) {
+                Thread.sleep(100);
+            }
+        } while (System.nanoTime() < deadLine);
+        task.run();
+    }
+
+    private interface Task {
+        void run() throws Exception;
+    }
+
+    private void assertSql(String expectedResult, String query) throws IOException {
+        String encodedQuery = URLEncoder.encode(query, "UTF-8");
+        HttpGet httpGet = new HttpGet(String.format("http://%s:%d//exp?query=%s", questdb.getHost(), questdb.getMappedPort(HTTP_PORT), encodedQuery));
+        CloseableHttpResponse response = HTTP_CLIENT.execute(httpGet);
+        HttpEntity entity = response.getEntity();
+        if (entity != null) {
+            String s = EntityUtils.toString(entity);
+            assertEquals(expectedResult, s);
+        } else {
+            fail("no response");
+        }
     }
 
 }

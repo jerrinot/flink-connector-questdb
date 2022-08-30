@@ -13,9 +13,11 @@
     <packaging>jar</packaging>
 
     <properties>
-        <questdb.version>6.5-jdk8</questdb.version>
+        <questdb.version>6.5.1-jdk8</questdb.version>
         <flink.version>1.15.2</flink.version>
         <testcontainers.version>1.17.3</testcontainers.version>
+        <httpclient.version>4.5.13</httpclient.version>
+
         <maven.compiler.source>1.8</maven.compiler.source>
         <maven.compiler.target>1.8</maven.compiler.target>
     </properties>
@@ -33,15 +35,7 @@
         <dependency>
             <groupId>org.questdb</groupId>
             <artifactId>questdb</artifactId>
-            <version>6.5.1-jdk8</version>
-        </dependency>
-
-
-        <!-- We need to include httpcore-nio again in the correct version due to the exclusion above -->
-        <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpcore-nio</artifactId>
-            <version>4.4.12</version>
+            <version>${questdb.version}</version>
         </dependency>
 
         <!-- Tests -->
@@ -57,6 +51,12 @@
             <artifactId>junit-jupiter</artifactId>
             <version>${testcontainers.version}</version>
             <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+            <version>${httpclient.version}</version>
         </dependency>
 
         <dependency>
