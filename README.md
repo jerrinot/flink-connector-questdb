@@ -9,8 +9,7 @@ Apache Flink Table &amp; SQL Connector for QuestDB
 3. Start Apache Flink [SQL Console](https://nightlies.apache.org/flink/flink-docs-master/docs/dev/table/sqlclient/)
 4. Create a dynamic table in Flink SQL Console:
 ```sql
-CREATE TABLE questTable (a BIGINT NOT NULL,
-b STRING) WITH (
+CREATE TABLE questTable (a BIGINT NOT NULL, b STRING) WITH (
 'connector'='questdb',
 'host'='localhost',
 'table'='flink_table'
