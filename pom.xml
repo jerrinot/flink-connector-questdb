@@ -12,6 +12,28 @@
 
     <packaging>jar</packaging>
 
+    <scm>
+        <connection>scm:git:git@github.com:jerrinot/flink-connector-questdb.git</connection>
+        <developerConnection>scm:git:git@github.com:jerrinot/flink-connector-questdb.git</developerConnection>
+        <url>https://github.com/jerrinot/flink-connector-questdb</url>
+        <tag>HEAD</tag>
+    </scm>
+
+
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>Jaromir Hamala</name>
+            <email>jaromir.hamala@gmail.com</email>
+        </developer>
+    </developers>
+
     <properties>
         <questdb.version>6.5.1-jdk8</questdb.version>
         <flink.version>1.15.2</flink.version>
