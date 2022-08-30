@@ -17,6 +17,7 @@ jobs:
           distribution: 'adopt'
           cache: maven
           server-id: github
+          settings-path: ${{ github.workspace }}
       - name: Configure Git user
         run: |
           git config user.email "actions@github.com"
