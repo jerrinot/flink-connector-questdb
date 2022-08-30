@@ -11,8 +11,8 @@
     <packaging>jar</packaging>
 
     <scm>
-        <connection>scm:git:git@github.com:jerrinot/flink-connector-questdb.git</connection>
-        <developerConnection>scm:git:git@github.com:jerrinot/flink-connector-questdb.git</developerConnection>
+        <connection>scm:git:https://github.com/jerrinot/flink-connector-questdb.git</connection>
+        <developerConnection>scm:git:https://github.com/jerrinot/flink-connector-questdb.git</developerConnection>
         <url>https://github.com/jerrinot/flink-connector-questdb</url>
         <tag>HEAD</tag>
     </scm>
