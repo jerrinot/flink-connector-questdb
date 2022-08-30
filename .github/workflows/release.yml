@@ -1,7 +1,8 @@
 name: Publish package to GitHub Packages
 on:
-  release:
-    types: [created]
+  push:
+    branches:
+      - release
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -15,7 +16,11 @@ jobs:
           java-version: '8'
           distribution: 'adopt'
           cache: maven
-      - name: Publish package
-        run: mvn --batch-mode deploy
+      - name: Configure Git user
+        run: |
+          git config user.email "actions@github.com"
+          git config user.name "GitHub Actions"
+      - name: Publish JAR
+        run: ./mvnw -B release:prepare release:perform
         env:
           GITHUB_TOKEN: ${{ secrets.PACKAGE_PUBLISH_TOKEN }}
