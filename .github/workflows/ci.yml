@@ -33,6 +33,6 @@ jobs:
         with:
           java-version: 8
       - name: Publish SNAPSHOT version to GitHub Packages
-        run: mvn -B --no-transfer-progress deploy -DskipTests
+        run: mvn -B --no-transfer-progress deploy -DskipTests -DuniqueVersion=false
         env:
           GITHUB_TOKEN: ${{ secrets.PACKAGE_PUBLISH_TOKEN }}
