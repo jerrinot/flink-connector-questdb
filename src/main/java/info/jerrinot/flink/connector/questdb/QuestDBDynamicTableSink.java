@@ -2,6 +2,7 @@ package info.jerrinot.flink.connector.questdb;
 
 import org.apache.flink.table.connector.ChangelogMode;
 import org.apache.flink.table.connector.sink.DynamicTableSink;
+import org.apache.flink.table.connector.sink.SinkV2Provider;
 import org.apache.flink.table.types.DataType;
 
 /**
@@ -24,7 +25,7 @@ public final class QuestDBDynamicTableSink implements DynamicTableSink {
 
     @Override
     public SinkRuntimeProvider getSinkRuntimeProvider(Context context) {
-        return new QuestDBSinkRuntimeProvider(physicalRowDataType, questDBConfiguration);
+        return SinkV2Provider.of(new QuestDBSink(physicalRowDataType, questDBConfiguration));
     }
 
     @Override
