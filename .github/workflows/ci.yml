@@ -23,3 +23,16 @@ jobs:
         cache: maven
     - name: Build with Maven
       run: mvn -B package --file pom.xml
+  publish-snapshot:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up settings.xml for GitHub Packages
+        uses: actions/setup-java@v1
+        with:
+          java-version: 8
+      - name: Publish SNAPSHOT version to GitHub Packages
+        run: mvn -B --no-transfer-progress deploy -DskipTests
+        env:
+          GITHUB_TOKEN: ${{ secrets.PACKAGE_PUBLISH_TOKEN }}
