@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.flink.table.api.Expressions.row;
+import static org.awaitility.Awaitility.await;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -82,28 +83,13 @@ public class QuestDBDynamicSinkFactoryTest {
                                 LocalDateTime.parse("2012-12-12T12:12:12")))
                 .executeInsert("questTable")
                 .await();
-        assertEventually(() -> {
+
+        await().atMost(10, TimeUnit.SECONDS).until(() -> {
             assertSql("\"a\",\"b\",\"c\",\"d\",\"e\",\"f\",\"g\"\r\n"
-                    + "1,\"2022-06-01T10:10:10.000010Z\",\"ABCDE\",12.119999885559,2,\"2003-10-20T00:00:00.000000Z\",\"2012-12-12T12:12:12.000000Z\"\r\n",
+                            + "1,\"2022-06-01T10:10:10.000010Z\",\"ABCDE\",12.119999885559,2,\"2003-10-20T00:00:00.000000Z\",\"2012-12-12T12:12:12.000000Z\"\r\n",
                     "select a, b, c, d, e, f, g from flink_table");
+            return true;
         });
-    }
-
-    private static void assertEventually(Task task) throws Exception {
-        long deadLine = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
-        do {
-            try {
-                task.run();
-                return;
-            } catch (Throwable ignored) {
-                Thread.sleep(100);
-            }
-        } while (System.nanoTime() < deadLine);
-        task.run();
-    }
-
-    private interface Task {
-        void run() throws Exception;
     }
 
     private void assertSql(String expectedResult, String query) throws IOException {
