@@ -32,3 +32,4 @@ jobs:
           MAVEN_USERNAME: ${{ secrets.OSS_SONATYPE_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.OSS_SONATYPE_PASSWORD }}
           GITHUB_TOKEN: ${{ secrets.PACKAGE_PUBLISH_TOKEN }}
+          SIGN_KEY: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
