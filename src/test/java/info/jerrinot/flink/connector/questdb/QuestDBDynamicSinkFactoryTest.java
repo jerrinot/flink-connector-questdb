@@ -141,6 +141,37 @@ public class QuestDBDynamicSinkFactoryTest {
     }
 
     @Test
+    public void testInvalidColumnName() {
+        ResolvedSchema schema = ResolvedSchema.of(Column.physical("a*", DataTypes.INT()));
+        try {
+            FactoryMocks.createTableSink(schema, getSinkOptions());
+            fail("not supported");
+        } catch (ValidationException expected) { }
+    }
+
+    @Test
+    public void testInvalidTableName() {
+        ResolvedSchema schema = ResolvedSchema.of(Column.physical("a", DataTypes.INT()));
+        Map<String, String> sinkOptions = getSinkOptions();
+        sinkOptions.put(QuestDBConfiguration.TABLE.key(), "invalid*table*name");
+        try {
+            FactoryMocks.createTableSink(schema, sinkOptions);
+            fail("not supported");
+        } catch (ValidationException expected) { }
+    }
+
+    @Test
+    public void testSinkIsSerializable() {
+        ResolvedSchema schema = ResolvedSchema.of(Column.physical("a", DataTypes.BIGINT()));
+        DynamicTableSink dynamicTableSink = FactoryMocks.createTableSink(schema, getSinkOptions());
+        DynamicTableSink.SinkRuntimeProvider provider =
+                dynamicTableSink.getSinkRuntimeProvider(new SinkRuntimeProviderContext(false));
+        SinkV2Provider sinkProvider = (SinkV2Provider) provider;
+        Sink<RowData> sink = sinkProvider.createSink();
+        InstantiationUtil.isSerializable(sink);
+    }
+
+    @Test
     public void isSerializable() {
         ResolvedSchema schema = ResolvedSchema.of(Column.physical("a", DataTypes.BIGINT()));
         DynamicTableSink dynamicTableSink = FactoryMocks.createTableSink(schema, getSinkOptions());

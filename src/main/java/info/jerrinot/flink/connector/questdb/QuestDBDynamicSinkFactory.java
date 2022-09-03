@@ -1,5 +1,6 @@
 package info.jerrinot.flink.connector.questdb;
 
+import io.questdb.cairo.TableUtils;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ReadableConfig;
 import org.apache.flink.table.api.ValidationException;
@@ -30,6 +31,9 @@ public final class QuestDBDynamicSinkFactory implements DynamicTableSinkFactory 
         validateSchema(physicalRowDataType);
 
         QuestDBConfiguration configuration = new QuestDBConfiguration(readableConfig, context.getObjectIdentifier().getObjectName());
+        if (!TableUtils.isValidTableName(configuration.getTable(), Integer.MAX_VALUE)) {
+            throw new ValidationException(configuration.getTable() + " is not a valid table name");
+        }
         return new QuestDBDynamicTableSink(physicalRowDataType, configuration);
     }
 
@@ -37,6 +41,11 @@ public final class QuestDBDynamicSinkFactory implements DynamicTableSinkFactory 
         final RowType rowType = (RowType) physicalRowDataType.getLogicalType();
         List<RowType.RowField> fields = rowType.getFields();
         for (RowType.RowField field : fields) {
+            String fieldName = field.getName();
+            if (!TableUtils.isValidColumnName(fieldName, Integer.MAX_VALUE)) {
+                throw new ValidationException(fieldName + " is not a valid column name");
+            }
+
             LogicalTypeRoot typeRoot = field.getType().getTypeRoot();
             switch (typeRoot) {
                 // supported types
