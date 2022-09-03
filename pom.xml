@@ -147,7 +147,14 @@
                                 </goals>
                             </execution>
                         </executions>
-                        <version>3.0.1</version>
+                        <configuration>
+                            <!-- Prevent `gpg` from using pinentry programs -->
+                            <gpgArguments>
+                                <arg>--pinentry-mode</arg>
+                                <arg>loopback</arg>
+                            </gpgArguments>
+                        </configuration>
+                        <version>1.6</version>
                     </plugin>
                 </plugins>
             </build>

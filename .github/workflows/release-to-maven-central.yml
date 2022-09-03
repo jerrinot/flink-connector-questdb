@@ -21,12 +21,13 @@ jobs:
           server-username: MAVEN_USERNAME
           server-password: MAVEN_PASSWORD
           gpg-private-key: ${{ secrets.MAVEN_GPG_PRIVATE_KEY }}
+          cache: 'maven'
       - name: Configure Git user
         run: |
           git config user.email "actions@github.com"
           git config user.name "GitHub Actions"
       - name: Publish JAR
-        run: mvn -B release:prepare release:perform -P release
+        run: mvn -B release:prepare release:perform -P release -DdryRun=true
         env:
           MAVEN_USERNAME: ${{ secrets.OSS_SONATYPE_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.OSS_SONATYPE_PASSWORD }}
