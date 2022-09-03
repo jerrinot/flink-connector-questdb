@@ -41,6 +41,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.flink.table.api.Expressions.row;
@@ -156,6 +157,46 @@ public class QuestDBDynamicSinkFactoryTest {
             FactoryMocks.createTableSink(schema, getSinkOptions());
             fail("not supported");
         } catch (ValidationException expected) { }
+    }
+
+    @Test
+    public void testEventTime() throws ExecutionException, InterruptedException {
+        TableEnvironment tableEnvironment =
+                TableEnvironment.create(EnvironmentSettings.inStreamingMode());
+        tableEnvironment.getConfig().set(TableConfigOptions.LOCAL_TIME_ZONE, "UTC");
+        tableEnvironment.executeSql(
+                "CREATE TABLE questTable ("
+                        + "col_varchar VARCHAR,\n"
+                        + "col_integer INTEGER,\n"
+                        + "col_timestamp TIMESTAMP(3)\n,"
+                        + "WATERMARK FOR col_timestamp AS col_timestamp\n"
+                        + ")\n"
+                        + "WITH (\n"
+                        + String.format("'%s'='%s',\n", "connector", "questdb")
+                        + String.format("'%s'='%s',\n", "host", getIlpHostAndPort())
+                        + String.format("'%s'='%s'\n", "table", testName)
+                        + ")").await();
+
+        tableEnvironment.executeSql(
+                "CREATE TABLE datagen ("
+                        + "col_varchar VARCHAR,\n"
+                        + "col_integer INTEGER,\n"
+                        + "col_timestamp TIMESTAMP(3)\n,"
+                        + "WATERMARK FOR col_timestamp AS col_timestamp\n"
+                        + ")\n"
+                        + "WITH (\n"
+                        + String.format("'%s'='%s',\n", "connector", "datagen")
+                        + String.format("'%s'='%s'\n", "number-of-rows", "10")
+                        + ")").await();
+
+        tableEnvironment.executeSql(
+                "INSERT INTO questTable select * from datagen").await();
+
+        await().atMost(QUERY_WAITING_TIME_SECONDS, TimeUnit.SECONDS).untilAsserted(() -> {
+            assertSql("\"count\"\r\n"
+                            + "10\r\n",
+                    "select count(*) from " + testName + " where col_timestamp = timestamp");
+        });
     }
 
     @Test
