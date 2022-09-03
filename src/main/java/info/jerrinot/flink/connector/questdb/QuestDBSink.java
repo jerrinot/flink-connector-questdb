@@ -5,19 +5,20 @@ import org.apache.flink.api.connector.sink2.SinkWriter;
 import org.apache.flink.table.data.RowData;
 import org.apache.flink.table.data.TimestampData;
 import org.apache.flink.table.types.DataType;
+import org.apache.flink.table.types.logical.LocalZonedTimestampType;
 import org.apache.flink.table.types.logical.LogicalType;
 import org.apache.flink.table.types.logical.LogicalTypeRoot;
 import org.apache.flink.table.types.logical.RowType;
 import org.apache.flink.table.types.logical.TimestampType;
 
 import io.questdb.client.Sender;
+import org.apache.flink.table.types.logical.ZonedTimestampType;
 
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 
 public class QuestDBSink implements Sink<RowData> {
@@ -31,7 +32,7 @@ public class QuestDBSink implements Sink<RowData> {
     }
 
     @Override
-    public SinkWriter<RowData> createWriter(InitContext context) throws IOException {
+    public SinkWriter<RowData> createWriter(InitContext context) {
         Sender.LineSenderBuilder builder = Sender
                 .builder()
                 .address(questDBConfiguration.getHost());
@@ -71,7 +72,7 @@ public class QuestDBSink implements Sink<RowData> {
                     case SMALLINT:
                     case INTEGER:
                     case BIGINT:
-                        sender.longColumn(name, rw.getInt(i));
+                        sender.longColumn(name, rw.getLong(i));
                         break;
                     case FLOAT:
                         sender.doubleColumn(name, rw.getFloat(i));
@@ -82,17 +83,28 @@ public class QuestDBSink implements Sink<RowData> {
                     case DATE:
                         LocalDate localDate = LocalDate.ofEpochDay(rw.getInt(i));
                         ZonedDateTime utc = localDate.atStartOfDay(ZoneId.of("UTC"));
-                        utc.toEpochSecond();
                         long micros = TimeUnit.SECONDS.toMicros(utc.toEpochSecond());
                         sender.timestampColumn(name, micros);
                         break;
-                    case TIMESTAMP_WITHOUT_TIME_ZONE:
-                    case TIMESTAMP_WITH_TIME_ZONE:
                     case TIMESTAMP_WITH_LOCAL_TIME_ZONE:
-                        final int timestampPrecision = ((TimestampType) type).getPrecision();
+                        int timestampPrecision = ((LocalZonedTimestampType) type).getPrecision();
                         TimestampData timestamp = rw.getTimestamp(i, timestampPrecision);
                         micros = TimeUnit.MILLISECONDS.toMicros(timestamp.getMillisecond());
                         long microsInMillis = TimeUnit.NANOSECONDS.toMicros(timestamp.getNanoOfMillisecond());
+                        sender.timestampColumn(name, micros + microsInMillis);
+                        break;
+                    case TIMESTAMP_WITHOUT_TIME_ZONE:
+                        timestampPrecision = ((TimestampType) type).getPrecision();
+                        timestamp = rw.getTimestamp(i, timestampPrecision);
+                        micros = TimeUnit.MILLISECONDS.toMicros(timestamp.getMillisecond());
+                        microsInMillis = TimeUnit.NANOSECONDS.toMicros(timestamp.getNanoOfMillisecond());
+                        sender.timestampColumn(name, micros + microsInMillis);
+                        break;
+                    case TIMESTAMP_WITH_TIME_ZONE:
+                        timestampPrecision = ((ZonedTimestampType) type).getPrecision();
+                        timestamp = rw.getTimestamp(i, timestampPrecision);
+                        micros = TimeUnit.MILLISECONDS.toMicros(timestamp.getMillisecond());
+                        microsInMillis = TimeUnit.NANOSECONDS.toMicros(timestamp.getNanoOfMillisecond());
                         sender.timestampColumn(name, micros + microsInMillis);
                         break;
                     case TIME_WITHOUT_TIME_ZONE:
