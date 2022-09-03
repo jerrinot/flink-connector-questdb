@@ -1,3 +1,5 @@
+[![Java CI with Maven](https://github.com/jerrinot/flink-connector-questdb/actions/workflows/ci.yml/badge.svg)](https://github.com/jerrinot/flink-connector-questdb/actions/workflows/ci.yml)
+
 # flink-connector-questdb
 Apache Flink Table &amp; SQL Connector for QuestDB
 
