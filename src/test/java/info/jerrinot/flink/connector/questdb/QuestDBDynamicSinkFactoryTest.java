@@ -36,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.fail;
 @Testcontainers
 public class QuestDBDynamicSinkFactoryTest {
     private static final boolean USE_LOCAL_QUEST = false;
+    private static final int QUERY_WAITING_TIME_SECONDS = 30;
 
     private static final int ILP_PORT = 9009;
     private static final int HTTP_PORT = 9000;
@@ -49,7 +50,7 @@ public class QuestDBDynamicSinkFactoryTest {
 
     @Container
     public GenericContainer questdb = new GenericContainer(DockerImageName.parse("questdb/questdb:6.5.1"))
-            .withEnv("QDB_CAIRO_COMMIT_LAG", "100")
+            .withEnv("QDB_CAIRO_COMMIT_LAG", "2000")
             .withEnv("JAVA_OPTS", "-Djava.locale.providers=JRE,SPI") // this makes QuestDB container much faster to start
             .withExposedPorts(ILP_PORT, HTTP_PORT);
 
@@ -88,11 +89,10 @@ public class QuestDBDynamicSinkFactoryTest {
                 .executeInsert("questTable")
                 .await();
 
-        await().atMost(10, TimeUnit.SECONDS).until(() -> {
+        await().atMost(QUERY_WAITING_TIME_SECONDS, TimeUnit.SECONDS).untilAsserted(() -> {
             assertSql("\"a\",\"b\",\"c\",\"d\",\"e\",\"f\",\"g\"\r\n"
                             + "1,\"2022-06-01T10:10:10.000010Z\",\"ABCDE\",12.119999885559,2,\"2003-10-20T00:00:00.000000Z\",\"2012-12-12T12:12:12.000000Z\"\r\n",
                     "select a, b, c, d, e, f, g from flink_table");
-            return true;
         });
     }
 
@@ -152,11 +152,10 @@ public class QuestDBDynamicSinkFactoryTest {
                 ).executeInsert("questTable")
                 .await();
 
-        await().atMost(10, TimeUnit.SECONDS).until(() -> {
+        await().atMost(QUERY_WAITING_TIME_SECONDS, TimeUnit.SECONDS).untilAsserted(() -> {
             assertSql("\"a\",\"b\",\"c\",\"d\",\"h\",\"i\",\"j\",\"k\",\"l\",\"m\",\"n\",\"o\",\"p\",\"q\",\"r\"\r\n"
                             + "\"c\",\"varchar\",\"string\",true,42,42,42,42,10000000000,42.419998168945,42.42,\"2022-06-06T00:00:00.000000Z\",43920000,\"2022-09-03T12:12:12.000000Z\",\"2022-09-03T12:12:12.000000Z\"\r\n",
                     "select a, b, c, d, h, i, j, k, l, m, n, o, p, q, r from flink_table");
-            return true;
         });
     }
 
