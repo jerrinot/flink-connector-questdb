@@ -1,4 +1,5 @@
 [![Java CI with Maven](https://github.com/jerrinot/flink-connector-questdb/actions/workflows/ci.yml/badge.svg)](https://github.com/jerrinot/flink-connector-questdb/actions/workflows/ci.yml)
+[![Maven](https://maven-badges.herokuapp.com/maven-central/info.jerrinot/flink-connector-questdb/badge.png)](https://maven-badges.herokuapp.com/maven-central/info.jerrinot/flink-connector-questdb)
 
 # flink-connector-questdb
 Apache Flink Table &amp; SQL Connector for QuestDB
