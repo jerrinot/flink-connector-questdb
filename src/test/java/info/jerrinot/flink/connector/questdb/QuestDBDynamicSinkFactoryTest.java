@@ -1,8 +1,20 @@
 package info.jerrinot.flink.connector.questdb;
 
+import org.apache.flink.api.connector.sink2.Sink;
+import org.apache.flink.table.api.DataTypes;
 import org.apache.flink.table.api.EnvironmentSettings;
 import org.apache.flink.table.api.TableEnvironment;
+import org.apache.flink.table.api.ValidationException;
 import org.apache.flink.table.api.config.TableConfigOptions;
+import org.apache.flink.table.catalog.Column;
+import org.apache.flink.table.catalog.ResolvedSchema;
+import org.apache.flink.table.connector.sink.DynamicTableSink;
+import org.apache.flink.table.connector.sink.SinkV2Provider;
+import org.apache.flink.table.data.RowData;
+import org.apache.flink.table.factories.utils.FactoryMocks;
+import org.apache.flink.table.runtime.connector.sink.SinkRuntimeProviderContext;
+import org.apache.flink.table.types.DataType;
+import org.apache.flink.util.InstantiationUtil;
 import org.apache.flink.util.TestLoggerExtension;
 
 import org.apache.http.HttpEntity;
@@ -11,8 +23,10 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
-import org.junit.AfterClass;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInfo;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -25,6 +39,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 import java.time.LocalTime;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.apache.flink.table.api.Expressions.row;
@@ -42,17 +58,26 @@ public class QuestDBDynamicSinkFactoryTest {
     private static final int HTTP_PORT = 9000;
 
     private static final CloseableHttpClient HTTP_CLIENT = HttpClients.createDefault();
+    private String testName;
 
-    @AfterClass
+    @AfterAll
     public static void classTearDown() throws IOException {
         HTTP_CLIENT.close();
     }
 
     @Container
-    public GenericContainer questdb = new GenericContainer(DockerImageName.parse("questdb/questdb:6.5.1"))
-            .withEnv("QDB_CAIRO_COMMIT_LAG", "2000")
+    public static GenericContainer questdb = new GenericContainer(DockerImageName.parse("questdb/questdb:6.5.1"))
+            .withEnv("QDB_CAIRO_COMMIT_LAG", "100")
             .withEnv("JAVA_OPTS", "-Djava.locale.providers=JRE,SPI") // this makes QuestDB container much faster to start
             .withExposedPorts(ILP_PORT, HTTP_PORT);
+
+    @BeforeEach
+    public void setUp(TestInfo testInfo) throws IOException {
+        this.testName = testInfo.getTestMethod().orElseThrow(() -> new IllegalStateException("test name unknown")).getName();
+        if (questdb.isRunning()) {
+            executeQuery("drop table " + testName).close();
+        }
+    }
 
     @Test
     public void testSmoke() throws Exception {
@@ -73,7 +98,7 @@ public class QuestDBDynamicSinkFactoryTest {
                         + "WITH (\n"
                         + String.format("'%s'='%s',\n", "connector", "questdb")
                         + String.format("'%s'='%s',\n", "host", getIlpHostAndPort())
-                        + String.format("'%s'='%s'\n", "table", "flink_table")
+                        + String.format("'%s'='%s'\n", "table", testName)
                         + ")");
 
         tableEnvironment
@@ -92,8 +117,45 @@ public class QuestDBDynamicSinkFactoryTest {
         await().atMost(QUERY_WAITING_TIME_SECONDS, TimeUnit.SECONDS).untilAsserted(() -> {
             assertSql("\"a\",\"b\",\"c\",\"d\",\"e\",\"f\",\"g\"\r\n"
                             + "1,\"2022-06-01T10:10:10.000010Z\",\"ABCDE\",12.119999885559,2,\"2003-10-20T00:00:00.000000Z\",\"2012-12-12T12:12:12.000000Z\"\r\n",
-                    "select a, b, c, d, e, f, g from flink_table");
+                    "select a, b, c, d, e, f, g from " + testName);
         });
+    }
+
+    private static Map<String, String> getSinkOptions() {
+        Map<String, String> options = new HashMap<>();
+        options.put("connector", "questdb");
+        options.put("host", "whatever");
+        return options;
+    }
+
+    @Test
+    public void testUnsupportedTypes() {
+        assertTypeNotSupported(DataTypes.BINARY(10));
+        assertTypeNotSupported(DataTypes.INTERVAL(DataTypes.SECOND(3)));
+        assertTypeNotSupported(DataTypes.ARRAY(DataTypes.INT()));
+        assertTypeNotSupported(DataTypes.ROW());
+        assertTypeNotSupported(DataTypes.MULTISET(DataTypes.INT()));
+        assertTypeNotSupported(DataTypes.MAP(DataTypes.INT(), DataTypes.INT()));
+        assertTypeNotSupported(DataTypes.VARBINARY(100));
+    }
+
+    @Test
+    public void isSerializable() {
+        ResolvedSchema schema = ResolvedSchema.of(Column.physical("a", DataTypes.BIGINT()));
+        DynamicTableSink dynamicTableSink = FactoryMocks.createTableSink(schema, getSinkOptions());
+        DynamicTableSink.SinkRuntimeProvider provider =
+                dynamicTableSink.getSinkRuntimeProvider(new SinkRuntimeProviderContext(false));
+        SinkV2Provider sinkProvider = (SinkV2Provider) provider;
+        Sink<RowData> sink = sinkProvider.createSink();
+        InstantiationUtil.isSerializable(sink);
+    }
+
+    private static void assertTypeNotSupported(DataType dataType) {
+        ResolvedSchema schema = ResolvedSchema.of(Column.physical("a", dataType));
+        try {
+            FactoryMocks.createTableSink(schema, getSinkOptions());
+            fail("not supported");
+        } catch (ValidationException expected) { }
     }
 
     @Test
@@ -109,9 +171,6 @@ public class QuestDBDynamicSinkFactoryTest {
                         + "b VARCHAR,\n"
                         + "c STRING,\n"
                         + "d BOOLEAN,\n"
-//                        + "e BINARY,\n"
-//                        + "f VARBINARY,\n"
-//                        + "g BYTES,\n"
                         + "h DECIMAL,\n"
                         + "i TINYINT,\n"
                         + "j SMALLINT,\n"
@@ -123,12 +182,11 @@ public class QuestDBDynamicSinkFactoryTest {
                         + "p TIME,"
                         + "q TIMESTAMP,"
                         + "r TIMESTAMP_LTZ"
-//                        + "s INTERVAL"
                         + ")\n"
                         + "WITH (\n"
                         + String.format("'%s'='%s',\n", "connector", "questdb")
                         + String.format("'%s'='%s',\n", "host", getIlpHostAndPort())
-                        + String.format("'%s'='%s'\n", "table", "flink_table")
+                        + String.format("'%s'='%s'\n", "table", testName)
                         + ")");
 
         tableEnvironment
@@ -155,22 +213,27 @@ public class QuestDBDynamicSinkFactoryTest {
         await().atMost(QUERY_WAITING_TIME_SECONDS, TimeUnit.SECONDS).untilAsserted(() -> {
             assertSql("\"a\",\"b\",\"c\",\"d\",\"h\",\"i\",\"j\",\"k\",\"l\",\"m\",\"n\",\"o\",\"p\",\"q\",\"r\"\r\n"
                             + "\"c\",\"varchar\",\"string\",true,42,42,42,42,10000000000,42.419998168945,42.42,\"2022-06-06T00:00:00.000000Z\",43920000,\"2022-09-03T12:12:12.000000Z\",\"2022-09-03T12:12:12.000000Z\"\r\n",
-                    "select a, b, c, d, h, i, j, k, l, m, n, o, p, q, r from flink_table");
+                    "select a, b, c, d, h, i, j, k, l, m, n, o, p, q, r from " + testName);
         });
     }
 
 
     private void assertSql(String expectedResult, String query) throws IOException {
+        try (CloseableHttpResponse response = executeQuery(query)) {
+            HttpEntity entity = response.getEntity();
+            if (entity != null) {
+                String s = EntityUtils.toString(entity);
+                assertEquals(expectedResult, s);
+            } else {
+                fail("no response");
+            }
+        }
+    }
+
+    private CloseableHttpResponse executeQuery(String query) throws IOException {
         String encodedQuery = URLEncoder.encode(query, "UTF-8");
         HttpGet httpGet = new HttpGet(String.format("http://%s:%d//exp?query=%s", questdb.getHost(), questdb.getMappedPort(HTTP_PORT), encodedQuery));
-        CloseableHttpResponse response = HTTP_CLIENT.execute(httpGet);
-        HttpEntity entity = response.getEntity();
-        if (entity != null) {
-            String s = EntityUtils.toString(entity);
-            assertEquals(expectedResult, s);
-        } else {
-            fail("no response");
-        }
+        return HTTP_CLIENT.execute(httpGet);
     }
 
     private String getIlpHostAndPort() {

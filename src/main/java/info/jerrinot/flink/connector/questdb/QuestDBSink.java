@@ -14,7 +14,6 @@ import org.apache.flink.table.types.logical.TimestampType;
 import io.questdb.client.Sender;
 import org.apache.flink.table.types.logical.ZonedTimestampType;
 
-import java.io.IOException;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
