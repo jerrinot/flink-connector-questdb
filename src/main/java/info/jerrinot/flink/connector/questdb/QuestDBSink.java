@@ -36,13 +36,13 @@ public class QuestDBSink implements Sink<RowData> {
                 .builder()
                 .address(questDBConfiguration.getHost());
         if (questDBConfiguration.isTlsEnabled()) {
-            builder = builder.enableTls();
+            builder.enableTls();
         }
-        Optional<String> token = questDBConfiguration.getToken();
-        if (token.isPresent()) {
+        questDBConfiguration.getToken().ifPresent(t -> {
             String username = questDBConfiguration.getUserId();
-            builder = builder.enableAuth(username).authToken(token.get());
-        }
+            builder.enableAuth(username).authToken(t);
+        });
+        questDBConfiguration.getBufferSize().ifPresent(buffer -> builder.bufferCapacity(buffer * 1024));
         Sender sender = builder.build();
         WriterAdapter adapter = createAdapter(sender, physicalRowDataType, questDBConfiguration.getTable());
         return new QuestDBSinkWriter(adapter, sender);

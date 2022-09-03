@@ -3,6 +3,7 @@ package info.jerrinot.flink.connector.questdb;
 import org.apache.flink.configuration.ConfigOption;
 import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.ReadableConfig;
+import org.apache.flink.table.factories.FactoryUtil;
 
 import java.io.Serializable;
 import java.util.Optional;
@@ -36,8 +37,16 @@ public final class QuestDBConfiguration implements Serializable {
             ConfigOptions.key("tls")
                     .booleanType()
                     .defaultValue(false)
-                    .withDescription(
-                            "Optional enable TLS/SSL encryption");
+                    .withDescription("Optional enable TLS/SSL encryption");
+
+    public static final ConfigOption<Integer> BUFFER_SIZE_BYTES =
+            ConfigOptions.key("buffer.size.kb")
+                    .intType()
+                    .noDefaultValue()
+                    .withDescription("ILP client buffer size in KB");
+
+
+    public static final ConfigOption<Integer> SINK_PARALLELISM = FactoryUtil.SINK_PARALLELISM;
 
     private final ReadableConfig readableConfig;
     private final String internalCatalogName;
@@ -66,5 +75,13 @@ public final class QuestDBConfiguration implements Serializable {
 
     public Optional<String> getToken() {
         return readableConfig.getOptional(TOKEN);
+    }
+
+    public Integer getParallelism() {
+        return readableConfig.getOptional(SINK_PARALLELISM).orElse(null);
+    }
+
+    public Optional<Integer> getBufferSize() {
+        return readableConfig.getOptional(BUFFER_SIZE_BYTES);
     }
 }

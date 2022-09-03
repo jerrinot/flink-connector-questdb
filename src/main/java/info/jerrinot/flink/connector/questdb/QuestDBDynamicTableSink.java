@@ -25,7 +25,7 @@ public final class QuestDBDynamicTableSink implements DynamicTableSink {
 
     @Override
     public SinkRuntimeProvider getSinkRuntimeProvider(Context context) {
-        return SinkV2Provider.of(new QuestDBSink(physicalRowDataType, questDBConfiguration));
+        return SinkV2Provider.of(new QuestDBSink(physicalRowDataType, questDBConfiguration), questDBConfiguration.getParallelism());
     }
 
     @Override
